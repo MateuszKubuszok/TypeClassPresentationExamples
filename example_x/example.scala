@@ -6,8 +6,7 @@
 //> using dep io.circe::circe-generic::0.14.6
 //> using dep io.scalaland::chimney:0.8.3
 
-
-object Domain {
+package domain {
   case class Memo(name: String, content: String)
 
   trait MemoService {
@@ -27,7 +26,7 @@ object Domain {
   }
 }
 
-object Endpoints {
+package endpoints {
   case class MemoApi(content: String, name: String)
   case class FoundMemo(result: Option[MemoApi])
 
@@ -53,7 +52,7 @@ object Endpoints {
     .out(jsonBody[FoundMemo])
     .errorOut(stringBody)
 
-  trait Controller {
+  trait MemoController {
     def getMemo(passwd: Option[String], id: String): Either[String, FoundMemo]
     def setMemo(
         passwd: Option[String],
@@ -62,13 +61,16 @@ object Endpoints {
     ): Either[String, FoundMemo]
   }
 
-  def startServer(controller: Controller): Unit = {
-    import sttp.tapir.server.netty.{NettyFutureServer, NettyFutureServerBinding}
-    import scala.concurrent.ExecutionContext.Implicits.global
-    import scala.concurrent.{Await, Future}
-    import scala.concurrent.duration.Duration
+  import scala.concurrent.Future
+  import sttp.tapir.server.netty.NettyFutureServerBinding
 
-    val binding = NettyFutureServer()
+  def startServer(
+      controller: MemoController
+  ): Future[NettyFutureServerBinding] = {
+    import sttp.tapir.server.netty.NettyFutureServer
+    import scala.concurrent.ExecutionContext.Implicits.global
+
+    NettyFutureServer()
       .addEndpoint(getMemo.serverLogicPure { (id, passwd) =>
         controller.getMemo(passwd, id)
       })
@@ -76,41 +78,38 @@ object Endpoints {
         controller.setMemo(passwd, id, memo)
       })
       .start()
-
-    Await.result(
-      binding.flatMap { binding =>
-        println(s"Bound to ${binding.hostName}:${binding.port}")
-        println("Press Ctrl+D to shutdown")
-        while (scala.io.StdIn.readLine() != null)
-          () // block until the stream is closed
-        binding.stop()
-      },
-      Duration.Inf
-    )
   }
 }
 
-object App {
+package app {
 
-  import pureconfig._
-  import pureconfig.generic.derivation.default._
-
-  case class MemoConfig(passwd: String) derives ConfigReader
-  case class AppConfig(memo: MemoConfig) derives ConfigReader
+  case class MemoConfig(passwd: String)
+  case class AppConfig(memo: MemoConfig)
   object AppConfig {
 
     def getOrThrow: AppConfig = {
-      ConfigSource.default.load[AppConfig].fold(e => throw Exception(e.prettyPrint()), a => a)
+      import pureconfig.*
+      import pureconfig.generic.derivation.default.*
+      given ConfigReader[AppConfig] = ConfigReader.derived[AppConfig]
+      ConfigSource.default
+        .load[AppConfig]
+        .fold(e => throw Exception(e.prettyPrint()), a => a)
     }
   }
 
-  class MemoController(config: MemoConfig, service: Domain.MemoService) extends Endpoints.Controller {
+  class MemoControllerImpl(config: MemoConfig, service: domain.MemoService)
+      extends endpoints.MemoController {
     import io.scalaland.chimney.dsl.*
 
-    def getMemo(passwd: Option[String], id: String): Either[String, Endpoints.FoundMemo] = 
+    def getMemo(
+        passwd: Option[String],
+        id: String
+    ): Either[String, endpoints.FoundMemo] =
       if (passwd.contains(config.passwd)) {
         val memo = service.get(id)
-        Right(Endpoints.FoundMemo(memo.transformInto[Option[Endpoints.MemoApi]]))
+        Right(
+          endpoints.FoundMemo(memo.transformInto[Option[endpoints.MemoApi]])
+        )
       } else {
         Left("Wrong password")
       }
@@ -118,11 +117,11 @@ object App {
     def setMemo(
         passwd: Option[String],
         id: String,
-        memo: Endpoints.MemoApi
-    ): Either[String, Endpoints.FoundMemo] =
+        memoApi: endpoints.MemoApi
+    ): Either[String, endpoints.FoundMemo] =
       if (passwd.contains(config.passwd)) {
-        service.set(id, memo.transformInto[Domain.Memo])
-        Right(Endpoints.FoundMemo(Some(memo)))
+        service.set(id, memoApi.transformInto[domain.Memo])
+        Right(endpoints.FoundMemo(Some(memoApi)))
       } else {
         Left("Wrong password")
       }
@@ -131,10 +130,26 @@ object App {
 
 @main
 def runExample: Unit = {
-  val config = App.AppConfig.getOrThrow
-  val service = Domain.MemoService.inMemory
-  val controller = new App.MemoController(config.memo, service)
-  Endpoints.startServer(controller)
-  println("Server shut down")
+  val config = app.AppConfig.getOrThrow
+  val service = domain.MemoService.inMemory
+  val controller = new app.MemoControllerImpl(config.memo, service)
+  val serverStartup = endpoints.startServer(controller)
+
+  import scala.concurrent.Await
+  import scala.concurrent.duration.Duration
+  import scala.concurrent.ExecutionContext.Implicits.global
+
+  val serverShutdown = serverStartup.flatMap { binding =>
+    println(s"Config: $config")
+    println(s"Bound to ${binding.hostName}:${binding.port}")
+    println("Press Ctrl+D to shutdown")
+    while (scala.io.StdIn.readLine() != null)
+      () // block until the stream is closed
+    println("Shutting down")
+    binding.stop()
+  }
+
+  Await.result(serverShutdown, Duration.Inf)
+
   sys.exit(0)
 }
