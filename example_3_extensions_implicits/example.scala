@@ -3,8 +3,7 @@
 trait Show[A] {
   def show(a: A): String
 }
-extension [A](value: A)
-  def show(using show: Show[A]): String = show.show(value)
+extension [A](value: A) def show(using show: Show[A]): String = show.show(value)
 
 class MyUser(val name: String, val surname: String) {
   override def toString(): String = s"MyUser($name, $surname)"
@@ -16,13 +15,16 @@ class SomeonesUser(val name: String, val surname: String)
 
 @main def showExample(): Unit = {
   val myUser = new MyUser("John", "Smith")
-  given Show[MyUser] = usr => s"MyUser(name = ${usr.name}, surname = ${usr.surname})"
+  given Show[MyUser] = usr =>
+    s"MyUser(name = ${usr.name}, surname = ${usr.surname})"
 
   val myUser2 = MyUser2("John", "Smith")
-  given Show[MyUser2] = usr => s"MyUser2(name = ${usr.name}, surname = ${usr.surname})"
+  given Show[MyUser2] = usr =>
+    s"MyUser2(name = ${usr.name}, surname = ${usr.surname})"
 
   val someonesUser = new SomeonesUser("John", "Smith")
-  given Show[SomeonesUser] = usr => s"SomeonesUser(name = ${usr.name}, surname = ${usr.surname})"
+  given Show[SomeonesUser] = usr =>
+    s"SomeonesUser(name = ${usr.name}, surname = ${usr.surname})"
 
   val myUserArr = Array(myUser)
   given Show[Array[MyUser]] = arr => s"Array(${arr.map(_.show).mkString(", ")})"

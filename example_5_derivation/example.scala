@@ -9,9 +9,10 @@ trait Show[A] {
 object Show extends AutoDerivation[Show] {
 
   given Show[String] = str => '"' + str + '"'
-  given Show[Int] = int => int.toString 
+  given Show[Int] = int => int.toString
 
-  given [A](using A: Show[A]): Show[Array[A]] = arr => s"Array(${arr.map(_.show).mkString(", ")})"
+  given [A](using A: Show[A]): Show[Array[A]] = arr =>
+    s"Array(${arr.map(_.show).mkString(", ")})"
 
   def join[A](ctx: CaseClass[Show, A]): Show[A] = a => {
     val params = ctx.params.map { param =>
@@ -19,17 +20,17 @@ object Show extends AutoDerivation[Show] {
       val value = param.deref(a).show(using param.typeclass)
       s"$name = $value"
     }
-    ctx.typeInfo.short + (if (params.isEmpty) "" else s"(${params.mkString(", ")})")
+    ctx.typeInfo.short + (if (params.isEmpty) ""
+                          else s"(${params.mkString(", ")})")
   }
-  
+
   def split[A](ctx: SealedTrait[Show, A]): Show[A] = a => {
     ctx.choose(a) { subtype =>
       subtype.value.show(using subtype.typeclass)
     }
   }
 }
-extension [A](value: A)
-  def show(using show: Show[A]): String = show.show(value)
+extension [A](value: A) def show(using show: Show[A]): String = show.show(value)
 
 case class MyUser(name: String, surname: String)
 

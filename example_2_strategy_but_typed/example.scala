@@ -16,16 +16,20 @@ def show[A](value: A)(show: Show[A]): String = show.show(value)
 
 @main def showExample(): Unit = {
   val myUser = new MyUser("John", "Smith")
-  val myUserShow: Show[MyUser] = usr => s"MyUser(name = ${usr.name}, surname = ${usr.surname})"
+  val myUserShow: Show[MyUser] = usr =>
+    s"MyUser(name = ${usr.name}, surname = ${usr.surname})"
 
   val myUser2 = MyUser2("John", "Smith")
-  val myUser2Show: Show[MyUser2] = usr => s"MyUser2(name = ${usr.name}, surname = ${usr.surname})"
+  val myUser2Show: Show[MyUser2] = usr =>
+    s"MyUser2(name = ${usr.name}, surname = ${usr.surname})"
 
   val someonesUser = new SomeonesUser("John", "Smith")
-  val someonesUserShow: Show[SomeonesUser] = usr => s"SomeonesUser(name = ${usr.name}, surname = ${usr.surname})"
+  val someonesUserShow: Show[SomeonesUser] = usr =>
+    s"SomeonesUser(name = ${usr.name}, surname = ${usr.surname})"
 
   val myUserArr = Array(myUser)
-  val myUserArrShow: Show[Array[MyUser]] = arr => s"Array(${arr.map(myUserShow.show).mkString(", ")})"
+  val myUserArrShow: Show[Array[MyUser]] = arr =>
+    s"Array(${arr.map(myUserShow.show).mkString(", ")})"
 
   println("MyUser:")
   println(s"toString: $myUser")

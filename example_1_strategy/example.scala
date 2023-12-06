@@ -1,7 +1,7 @@
 //> using scala 3.3.1
 
 trait Discount {
-  def apply(price: Int): Int 
+  def apply(price: Int): Int
 }
 
 class Voucher(amount: Int) extends Discount {
@@ -18,7 +18,11 @@ class Sale(percent: Double) extends Discount {
 
 case class Item(name: String, price: Int)
 
-def applyDiscounts(item: Item, quantity: Int, discount: Option[Discount]): (Int, Int) = {
+def applyDiscounts(
+    item: Item,
+    quantity: Int,
+    discount: Option[Discount]
+): (Int, Int) = {
   val price = item.price * quantity
   val discounted = discount.fold(price)(_.apply(price))
   (price, discounted)
@@ -31,7 +35,9 @@ def applyDiscounts(item: Item, quantity: Int, discount: Option[Discount]): (Int,
     (Item("pot", 20), 2, Some(new Sale(0.10)))
   ).map { case (item, quantity, discount) =>
     val (price, discountedPrice) = applyDiscounts(item, quantity, discount)
-    println(s"Item: ${item.name}, unit price: ${item.price}, quantity: $quantity, total: $price, discounted: $discountedPrice ($discount)")
+    println(
+      s"Item: ${item.name}, unit price: ${item.price}, quantity: $quantity, total: $price, discounted: $discountedPrice ($discount)"
+    )
     discountedPrice
   }.sum
 
