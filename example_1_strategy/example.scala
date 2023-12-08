@@ -2,7 +2,7 @@
 
 // in Java it would be:
 // interface DiscountStrategy {
-//   int apply(int price) 
+//   int apply(int price)
 // }
 trait DiscountStrategy {
   def apply(price: Int): Int

@@ -6,9 +6,12 @@
 //> using dep io.circe::circe-generic::0.14.6
 //> using dep io.scalaland::chimney:0.8.3
 
+// Here we define our Memo's domain models and services:
 package domain {
+  // domain model:
   case class Memo(name: String, content: String)
 
+  // domain service:
   trait MemoService {
     def get(id: String): Option[Memo]
     def set(id: String, value: Memo): Unit
@@ -26,32 +29,17 @@ package domain {
   }
 }
 
+// Here we define JSON entities and HTTP endpoints:
 package endpoints {
+  // API models:
+
+  // { "content": "...", "name": "..." }
   case class MemoApi(content: String, name: String)
+  // { "result": null } or
+  // { "result": { "content": "...", "name": "..." } }
   case class FoundMemo(result: Option[MemoApi])
 
-  import sttp.tapir.*
-  import sttp.tapir.json.circe.*
-  import sttp.tapir.generic.auto.*
-  import io.circe.generic.auto.*
-
-  // GET /memos/{id}?passwd={passwd}
-  val getMemo = endpoint.get
-    .in("memos")
-    .in(path[String]("id"))
-    .in(query[Option[String]]("passwd"))
-    .out(jsonBody[FoundMemo])
-    .errorOut(stringBody)
-
-  // PUT /memos/{id}?passwd={passwd} [memo api payload]
-  val setMemo = endpoint.put
-    .in("memos")
-    .in(path[String]("id"))
-    .in(query[Option[String]]("passwd"))
-    .in(jsonBody[MemoApi])
-    .out(jsonBody[FoundMemo])
-    .errorOut(stringBody)
-
+  // API endpoints logic:
   trait MemoController {
     def getMemo(passwd: Option[String], id: String): Either[String, FoundMemo]
     def setMemo(
@@ -61,6 +49,36 @@ package endpoints {
     ): Either[String, FoundMemo]
   }
 
+  // Nice library for JSON serialization
+  import io.circe.generic.auto.*
+  // Nice library for defining endpoints with DSL
+  // and then deciding how to run them.
+  import sttp.tapir.*
+  import sttp.tapir.json.circe.*
+  import sttp.tapir.generic.auto.*
+
+  // Definition of:
+  //   GET /memos/{id}?passwd={passwd} -> [FoundMemo JSON]
+  // routing
+  val getMemo = endpoint.get
+    .in("memos")
+    .in(path[String]("id"))
+    .in(query[Option[String]]("passwd"))
+    .out(jsonBody[FoundMemo]) // <- type class derivation of JSON decoder!
+    .errorOut(stringBody)
+
+  // Definition of:
+  //   PUT /memos/{id}?passwd={passwd} [MemoApi JSON] -> [FoundMemo JSON]
+  // routing
+  val setMemo = endpoint.put
+    .in("memos")
+    .in(path[String]("id"))
+    .in(query[Option[String]]("passwd"))
+    .in(jsonBody[MemoApi]) // <- type class derivation of JSON encoder!
+    .out(jsonBody[FoundMemo]) // <- type class derivation of JSON decoder!
+    .errorOut(stringBody)
+
+  // Taking our endpoint definitions and turning into Netty server:
   import scala.concurrent.Future
   import sttp.tapir.server.netty.NettyFutureServerBinding
 
@@ -71,25 +89,31 @@ package endpoints {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     NettyFutureServer()
+      // wires GET /memos/... route to controller.getMemo
       .addEndpoint(getMemo.serverLogicPure { (id, passwd) =>
         controller.getMemo(passwd, id)
       })
+      // wires PUT /memos/... route to controller.setMemo
       .addEndpoint(setMemo.serverLogicPure { (id, passwd, memo) =>
         controller.setMemo(passwd, id, memo)
       })
+      // starts server on default ports
       .start()
   }
 }
 
 package app {
 
+  // configs:
   case class MemoConfig(passwd: String)
   case class AppConfig(memo: MemoConfig)
   object AppConfig {
 
     def getOrThrow: AppConfig = {
+      // Nice library for parsing HOCON (Typesafe Config) into case clases
       import pureconfig.*
       import pureconfig.generic.derivation.default.*
+      // Type class derivation of our config's parsers
       given ConfigReader[AppConfig] = ConfigReader.derived[AppConfig]
       ConfigSource.default
         .load[AppConfig]
@@ -97,8 +121,10 @@ package app {
     }
   }
 
+  // business logic using domain models:
   class MemoControllerImpl(config: MemoConfig, service: domain.MemoService)
       extends endpoints.MemoController {
+    // Nice library for type mapping (like MapStruct/Dozer/Orca/JMapper/...)
     import io.scalaland.chimney.dsl.*
 
     def getMemo(
@@ -108,6 +134,7 @@ package app {
       if (passwd.contains(config.passwd)) {
         val memo = service.get(id)
         Right(
+          // Type class derivation converting Option[Memo] -> Option[MemoApi]
           endpoints.FoundMemo(memo.transformInto[Option[endpoints.MemoApi]])
         )
       } else {
@@ -120,6 +147,7 @@ package app {
         memoApi: endpoints.MemoApi
     ): Either[String, endpoints.FoundMemo] =
       if (passwd.contains(config.passwd)) {
+        // Type class derivation converting MemoApi -> Memo
         service.set(id, memoApi.transformInto[domain.Memo])
         Right(endpoints.FoundMemo(Some(memoApi)))
       } else {
@@ -128,8 +156,8 @@ package app {
   }
 }
 
-@main
-def runExample: Unit = {
+// wiring everything together
+@main def runExample: Unit = {
   val config = app.AppConfig.getOrThrow
   val service = domain.MemoService.inMemory
   val controller = new app.MemoControllerImpl(config.memo, service)
