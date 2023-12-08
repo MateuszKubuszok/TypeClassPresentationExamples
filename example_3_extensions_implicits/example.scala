@@ -11,7 +11,7 @@ class MyUser(val name: String, val surname: String) {
 
 case class MyUser2(name: String, surname: String)
 
-class SomeonesUser(val name: String, val surname: String)
+final class SomeonesUser(val name: String, val surname: String)
 
 @main def showExample(): Unit = {
   val myUser = new MyUser("John", "Smith")

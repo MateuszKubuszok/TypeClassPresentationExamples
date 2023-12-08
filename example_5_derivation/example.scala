@@ -44,6 +44,6 @@ case class MyUser(name: String, surname: String)
   println("Array[(String, String, Int)]")
   println(Array(("John", "Smith", 21)).show)
   println()
-  println("MyUser")
+  println("Array[MyUser]")
   println(Array(MyUser("John", "Smith")).show)
 }

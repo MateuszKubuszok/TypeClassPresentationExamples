@@ -10,7 +10,7 @@ class MyUser(val name: String, val surname: String) {
 
 case class MyUser2(name: String, surname: String)
 
-class SomeonesUser(val name: String, val surname: String)
+final class SomeonesUser(val name: String, val surname: String)
 
 def show[A](value: A)(show: Show[A]): String = show.show(value)
 

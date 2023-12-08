@@ -1,27 +1,34 @@
 //> using scala 3.3.1
 
-trait Discount {
+// in Java it would be:
+// interface DiscountStrategy {
+//   int apply(int price) 
+// }
+trait DiscountStrategy {
   def apply(price: Int): Int
 }
 
-class Voucher(amount: Int) extends Discount {
+class Voucher(amount: Int) extends DiscountStrategy {
   def apply(price: Int): Int = math.max(price - amount, 0)
 
   override def toString(): String = s"Voucher for $amount"
 }
 
-class Sale(percent: Double) extends Discount {
+class Sale(percent: Double) extends DiscountStrategy {
   def apply(price: Int): Int = (price * percent).toInt
 
   override def toString(): String = s"Sale ${percent * 100}%"
 }
 
+// in Java it would be:
+// public record Item(String name, int price)
 case class Item(name: String, price: Int)
 
 def applyDiscounts(
     item: Item,
     quantity: Int,
-    discount: Option[Discount]
+    // in Java it would be java.util.Optional<DiscountStrategy>
+    discount: Option[DiscountStrategy]
 ): (Int, Int) = {
   val price = item.price * quantity
   val discounted = discount.fold(price)(_.apply(price))
